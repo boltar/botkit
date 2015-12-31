@@ -135,16 +135,37 @@ controller.hears(['stats (.+)'],'direct_message,direct_mention,mention,ambient',
   var name = matches[1];
   controller.storage.users.get(name,function(err,user) {
     if (!user) {
-      bot.reply(message, name + " hasn't answered any questions yet!");
+      bot.reply(message, name + " hasn't answered any questions yet!")
     } else {
-      var ratio
-      if (user.incorrect + user.correct > 0)
+      bot.reply(message, construct_stats_str, name,user.correct, user.incorrect)
+    }
+  })
+})
+
+function construct_stats_str(user, correct, incorrect) {
+  var ratio
+  if (incorrect + correct > 0)
+  {
+    ratio = "(" + (correct * 100 / (correct + incorrect)).toFixed(2) + "% correct)"
+  } else {
+    ratio = ""
+  }
+  return user + " has answered " + correct + " correctly, and " + incorrect + " incorrectly. " + ratio+ "\n";
+}
+
+controller.hears(['^statsall$'],'direct_message,direct_mention,mention,ambient',function(bot,message) {
+  console.log("heard statsall")
+
+  controller.storage.users.all(function(err,users) {
+    if (!users) {
+      bot.reply(message, "Nobody has answered any questions yet!");
+    } else {
+      var reply_str = ""
+      for (i in users) //i is the string key for the map ojb
       {
-        ratio = "(" + (user.correct * 100 / (user.correct + user.incorrect)).toFixed(2) + "% correct)"
-      } else {
-        ratio = ""
+        reply_str += construct_stats_str(i, users[i].correct, users[i].incorrect);
       }
-      bot.reply(message, name + " has answered " + user.correct + " correctly, and " + user.incorrect + " incorrectly. " + ratio );
+      bot.reply(message, reply_str);
     }
   })
 })
