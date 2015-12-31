@@ -63,7 +63,6 @@ This bot demonstrates many of the core features of Botkit:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-
 var Botkit = require('./lib/Botkit.js')
 var os = require('os');
 
@@ -88,7 +87,7 @@ controller.hears(['That is correct, (.+)\.'],'direct_message,ambient',function(b
   controller.storage.users.get(name,function(err,user) {
     if (!user) {
       user = {
-        id: name,
+        id: message.name,
         correct: 1,
         incorrect: 0
       } 
@@ -103,7 +102,7 @@ controller.hears(['That is correct, (.+)\.'],'direct_message,ambient',function(b
 })
 
 controller.hears(['That is incorrect, (.+)\.'],'direct_message,ambient',function(bot,message) {
-  console.log("heard incorrect")
+  console.log("heard correct")
   var matches = message.text.match(/That is incorrect, (.+)\./);
   if (matches == null) {
     return;
@@ -112,7 +111,7 @@ controller.hears(['That is incorrect, (.+)\.'],'direct_message,ambient',function
   controller.storage.users.get(name,function(err,user) {
     if (!user) {
       user = {
-        id: name,
+        id: message.name,
         correct: 0,
         incorrect: 1
       } 
@@ -128,7 +127,7 @@ controller.hears(['That is incorrect, (.+)\.'],'direct_message,ambient',function
 
 controller.hears(['stats (.+)'],'direct_message,direct_mention,mention,ambient',function(bot,message) {
   console.log("heard stats")
-  
+
   var matches = message.text.match(/stats (.+)/);
   if (matches == null) {
     return;
@@ -150,9 +149,10 @@ controller.hears(['stats (.+)'],'direct_message,direct_mention,mention,ambient',
   })
 })
 
+
 controller.hears(['reset (.+)'],'direct_message,direct_mention,mention,ambient',function(bot,message) {
-  console.log("heard reset")
-  
+  console.log("heard stats")
+
   var matches = message.text.match(/reset (.+)/);
   if (matches == null) {
     return;
@@ -160,13 +160,81 @@ controller.hears(['reset (.+)'],'direct_message,direct_mention,mention,ambient',
   var name = matches[1];
   controller.storage.users.get(name,function(err,user) {
     if (!user) {
-      bot.reply(message, name + " doesn't have any stats to reset!")
+      bot.reply(message, name + " hasn't answered any questions yet!");
     } else {
-      user.incorrect = 0;
-      user.correct = 0;
+      reset_stats(name)
+      bot.reply(message, "reset " + name + "'s stats");
+    }
+  })
+})
+
+controller.on('bot_message',function(bot,message) {
+
+  console.log("heard: " + message.text)
+  var name
+  var matches = message.text.match(/That is incorrect, (.+)\. /)
+  if (matches != null) {
+    name = matches[1]
+    if (name) {
+      increment_incorrect(name)
+    }
+    return
+  } 
+  matches = message.text.match(/That is correct, (.+)\. /);
+  if (matches != null) {
+    name = matches[1]
+    if (name) {
+      increment_correct(name)
+    }
+    return
+  }
+})
+
+function increment_incorrect(name)
+{
+  controller.storage.users.get(name,function(err,user) {
+    if (!user) {
+      user = {
+        id: name,
+        correct: 0,
+        incorrect: 1
+      } 
+      controller.storage.users.save(user, function(err,id) {
+      })
+    } else {
+      user.incorrect = user.incorrect + 1
       controller.storage.users.save(user, function(err,id) {
       })
     }
-    bot.reply(message, "Ok, I'll reset " + name + "'s stats.")
   })
-})
+}
+
+function increment_correct(name)
+{
+  controller.storage.users.get(name,function(err,user) {
+    if (!user) {
+      user = {
+        id: name,
+        correct: 1,
+        incorrect: 0
+      } 
+      controller.storage.users.save(user, function(err,id) {
+      })
+    } else {
+      user.correct = user.correct + 1
+      controller.storage.users.save(user, function(err,id) {
+      })
+    }
+  })
+}
+
+function reset_stats(name)
+{
+  user = {
+    id: name,
+    correct: 0,
+    incorrect: 0
+  } 
+  controller.storage.users.save(user, function(err,id) {
+  })
+}
