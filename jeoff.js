@@ -137,7 +137,7 @@ controller.hears(['stats (.+)'],'direct_message,direct_mention,mention,ambient',
     if (!user) {
       bot.reply(message, name + " hasn't answered any questions yet!")
     } else {
-      bot.reply(message, construct_stats_str, name,user.correct, user.incorrect)
+      bot.reply(message, construct_stats_str(name,user.correct, user.incorrect))
     }
   })
 })
