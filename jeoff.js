@@ -201,7 +201,7 @@ controller.on('bot_message',function(bot,message) {
     }
     return
   } 
-  matches = message.text.match(/That is correct, (.+)\. /);
+  matches = message.text.match(/That is correct, (.+)\. Your total score is/);
   if (matches != null) {
     name = matches[1]
     if (name) {
