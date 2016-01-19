@@ -77,6 +77,26 @@ var bot = controller.spawn(
   }
 ).startRTM();
 
+// initialize the DB for any undefined fields
+controller.storage.users.all(function(err,users) {
+  if (!users) {
+    bot.reply(message, "Jeoff, at your service!");
+  } else {
+    for (i in users) //i is the string key for the map ojb
+    {
+      if (!users[i].correct) users[i].correct = 0
+      if (!users[i].correct_streak) users[i].correct_streak = 0
+      if (!users[i].max_correct_streak) users[i].max_correct_streak = 0
+      if (!users[i].incorrect) users[i].incorrect = 0
+      if (!users[i].incorrect_streak) users[i].incorrect_streak = 0
+      if (!users[i].max_incorrect_streak) users[i].max_incorrect_streak = 0
+      controller.storage.users.save(users[i], function(err, id) {
+        
+      })
+    }
+  }
+})
+
 controller.hears(['That is correct, (.+)\.'],'direct_message,ambient',function(bot,message) {
   console.log("heard correct")
   var matches = message.text.match(/That is correct, (.+)\./);
@@ -137,20 +157,30 @@ controller.hears(['stats (.+)'],'direct_message,direct_mention,mention,ambient',
     if (!user) {
       bot.reply(message, name + " hasn't answered any questions yet!")
     } else {
-      bot.reply(message, construct_stats_str(name,user.correct, user.incorrect))
+      bot.reply(message, construct_stats_str(name, user))
     }
   })
 })
 
-function construct_stats_str(user, correct, incorrect) {
+function construct_stats_str(user_name, user) {
   var ratio
-  if (incorrect + correct > 0)
+  if (user.incorrect + user.correct > 0)
   {
-    ratio = "(" + (correct * 100 / (correct + incorrect)).toFixed(2) + "% correct)"
+    ratio = "(" + (user.correct * 100 / (user.correct + user.incorrect)).toFixed(2) + "% correct). "
   } else {
     ratio = ""
   }
-  return user + " has answered " + correct + " correctly, and " + incorrect + " incorrectly. " + ratio+ "\n";
+  
+  streak = ""
+  if (user.correct_streak > 1) {
+    streak = "Currently in a correct streak of " + user.correct_streak + ". (personal best = " + user.max_correct_streak + ")"
+  } 
+  if (user.incorrect_streak > 1) {
+    streak = "Currently in an incorrect streak of " + user.incorrect_streak + ". (personal worst = " + user.max_incorrect_streak + ")" 
+  } 
+  
+
+  return user_name + " has answered " + user.correct + " correctly, and " + user.incorrect + " incorrectly. " + ratio +  streak + "\n";
 }
 
 controller.hears(['^statsall$'],'direct_message,direct_mention,mention,ambient',function(bot,message) {
@@ -163,7 +193,7 @@ controller.hears(['^statsall$'],'direct_message,direct_mention,mention,ambient',
       var reply_str = ""
       for (i in users) //i is the string key for the map ojb
       {
-        reply_str += construct_stats_str(i, users[i].correct, users[i].incorrect);
+        reply_str += construct_stats_str(i, users[i]);
       }
       bot.reply(message, reply_str);
     }
@@ -218,13 +248,22 @@ function increment_incorrect(name)
       user = {
         id: name,
         correct: 0,
-        incorrect: 1
+        incorrect: 1,
+        correct_streak: 0,
+        incorrect_streak: 1,
+        max_correct_streak: 0,
+        max_incorrect_streak: 0
       } 
       controller.storage.users.save(user, function(err,id) {
       })
     } else {
       user.incorrect = user.incorrect + 1
-      controller.storage.users.save(user, function(err,id) {
+      user.correct_streak = 0
+      user.incorrect_streak++
+      if (user.incorrect_streak > user.max_incorrect_streak) {
+        user.max_incorrect_streak = user.incorrect_streak
+      }
+     controller.storage.users.save(user, function(err,id) {
       })
     }
   })
@@ -237,17 +276,28 @@ function increment_correct(name)
       user = {
         id: name,
         correct: 1,
-        incorrect: 0
+        incorrect: 0,
+        correct_streak: 1,
+        incorrect_streak: 0,
+        max_correct_streak: 0,
+        max_incorrect_streak: 0
       } 
       controller.storage.users.save(user, function(err,id) {
       })
     } else {
       user.correct = user.correct + 1
+      user.incorrect_streak = 0
+      user.correct_streak++
+      if (user.correct_streak > user.max_correct_streak) {
+        user.max_correct_streak = user.correct_streak
+      }
+
       controller.storage.users.save(user, function(err,id) {
       })
     }
   })
 }
+
 
 function reset_stats(name)
 {
@@ -259,3 +309,61 @@ function reset_stats(name)
   controller.storage.users.save(user, function(err,id) {
   })
 }
+
+controller.hears(['help'], 'direct_message,direct_mention,mention', function(bot, message) {
+  console.log("help");
+  var help_text = "`stats <username>` show stats for user\n" + 
+                  "`statsall` show stats for everhyone\n" + 
+                  "`reset <username>` reset stats for user"
+    bot.reply(message, help_text)
+});
+
+controller.hears(['uptime', 'identify yourself', 'who are you', 'what is your name'], 'direct_message,direct_mention,mention', function(bot, message) {
+
+  var hostname = os.hostname();
+  var uptime = formatUptime(process.uptime());
+
+  bot.reply(message, ':robot_face: I am a bot named <@' + bot.identity.name + '>. I have been running for ' + uptime + ' on ' + hostname + ".");
+
+})
+
+function formatUptime(uptime) {
+  var unit = 'second';
+  if (uptime > 60) {
+    uptime = uptime / 60;
+    unit = 'minute';
+  }
+  if (uptime > 60) {
+    uptime = uptime / 60;
+    unit = 'hour';
+  }
+  if (uptime != 1) {
+    unit = unit + 's';
+  }
+
+  uptime = uptime.toFixed(2) + ' ' + unit;
+  return uptime;
+}
+
+controller.hears(['shutdown'], 'direct_message,direct_mention,mention', function(bot, message) {
+
+  bot.startConversation(message, function(err, convo) {
+    convo.ask("Are you sure you want me to shutdown?", [{
+      pattern: bot.utterances.yes,
+      callback: function(response, convo) {
+        convo.say("Bye!");
+        convo.next();
+        setTimeout(function() {
+          process.exit();
+        }, 3000);
+      }
+    }, {
+      pattern: bot.utterances.no,
+      default: true,
+      callback: function(response, convo) {
+        convo.say("*Phew!*");
+        convo.next();
+      }
+    }])
+  })
+})
