@@ -304,7 +304,11 @@ function reset_stats(name)
   user = {
     id: name,
     correct: 0,
-    incorrect: 0
+    correct_streak: 0,
+    max_correct_streak: 0,
+    incorrect: 0,
+    incorrect_streak: 0,
+    max_incorrect_streak: 0
   } 
   controller.storage.users.save(user, function(err,id) {
   })
